@@ -1,11 +1,40 @@
-# DingLater Mac
+<p align="center">
+  <img src="docs/logo.png" width="132" height="132" alt="DingLater Mac">
+</p>
 
-> 一个用 SwiftUI + SQLite 写的本地钉钉「稍后回复」收件箱：直接读取正在使用的加密 `dingtalk.db`，把新消息收进本地加密的回复箱，稍后再处理。
+<h1 align="center">DingLater Mac</h1>
 
-![platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue)
-![license](https://img.shields.io/badge/license-MIT-green)
+<p align="center">
+  本地、只读、实时的钉钉「稍后回复」收件箱<br/>
+  <sub>直接读取正在使用的加密 <code>dingtalk.db</code>，把新消息收进本地加密的回复箱。</sub>
+</p>
 
-**只供学习与个人使用。** 本项目是非官方独立实现，与钉钉 / 阿里巴巴无关。请只读取你自己有权访问的数据，并遵守所在地法律与钉钉服务条款。
+<p align="center">
+  <a href="https://github.com/shiwenbin1617/DingLaterMac/releases/latest">
+    <img alt="Release" src="https://img.shields.io/github/v/release/shiwenbin1617/DingLaterMac?color=2ea44f&label=release">
+  </a>
+  <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-1f1f1f?logo=apple&logoColor=white">
+  <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2ea44f"></a>
+</p>
+
+> **只供学习与个人使用。** 本项目是非官方独立实现，与钉钉 / 阿里巴巴无关。请只读取你自己有权访问的数据，并遵守所在地法律与钉钉服务条款。
+
+## 下载
+
+不想自己编译，可以直接使用预编译包（Apple 芯片）：
+
+1. 打开 [Releases](https://github.com/shiwenbin1617/DingLaterMac/releases/latest)，下载 `DingLater-Mac-v0.1.0-arm64.zip`。
+2. 解压后把 `DingLater.app` 拖进「应用程序」。
+3. 首次打开如果被 Gatekeeper 拦截（本包未做 Apple 公证），右键点 `DingLater.app` →「打开」，或执行：
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/DingLater.app
+   ```
+
+4. 打开「数据源与设置」，填入钉钉数据库密钥。
+
+预编译包只支持 macOS 13+，当前为 Apple 芯片（arm64）；Intel Mac 请从源码构建。仓库不提供、也不内置任何密钥。
 
 ## 功能
 
@@ -16,9 +45,9 @@
 - **本地加密**：每条消息用 AES-256-GCM 单独加密，主密钥存放在 macOS 钥匙串；系统通知不显示正文。
 - **原生界面**：SwiftUI + AppKit，菜单栏常驻，支持浅色 / 深色 / 跟随系统，窗口可置顶。
 
-## 快速开始
+## 从源码构建
 
-要求 macOS 13 或更新版本；源码构建需要带 macOS 26 SDK 的 Xcode 26（或相应的命令行工具），测试需要含 Swift Testing 的 Swift 6 工具链。
+要求 macOS 13 或更新版本；构建需要带 macOS 26 SDK 的 Xcode 26（或相应的命令行工具），测试需要含 Swift Testing 的 Swift 6 工具链。
 
 ```sh
 git clone https://github.com/shiwenbin1617/DingLaterMac.git
@@ -33,13 +62,21 @@ open dist/DingLater.app
 2. 写入 `~/Library/Application Support/DingLaterMac/dingtalk.key`（权限 0600）；
 3. 设置环境变量 `DINGLATER_DINGTALK_KEY=...`。
 
-> 仓库不提供、也不内置任何密钥。密钥是安装/账号级的，更换账号或重装钉钉后需要重新获取。应用只读数据源，不发送消息、不标记已读。
+密钥是安装/账号级的，更换账号或重装钉钉后需要重新获取。应用只读数据源，不发送消息、不标记已读。
 
 首次连接会为 128 张消息分表记录当前最大主键作为基线，回复箱从连接之后的新消息开始收录；刚连接时列表为空是预期行为。之后每 5 秒检查一次。
 
 ## 工作原理
 
 钉钉 Mac 的 `dingtalk.db` 是 ArkDB：每个 4096 字节页用 AES-128-ECB（无 IV、无填充）整体加密，因此相同的明文页（例如页 1 的 `SQLite format 3\0`）在不同库里会得到相同密文。应用通过一个 C 只读 VFS（`Sources/DingTalkVFS`）在读取时解密页面：
+
+```mermaid
+flowchart LR
+  A["dingtalk.db<br/>ArkDB · AES-128-ECB 整页"] --> B["只读解密 VFS<br/>+ 当前代 WAL 叠加"]
+  B --> C["会话聚合 · 姓名 / @ 提及解析"]
+  C --> D[("本地加密回复箱<br/>AES-256-GCM")]
+  D --> E["待处理 / 稍后提醒 / 已处理"]
+```
 
 - 只读打开，标记 `SQLITE_IOCAP_IMMUTABLE`，不锁库；
 - 解析 `-wal`，只取与 WAL 头 salt 匹配的当前代，并应用到最后一个 commit 帧；
@@ -57,6 +94,7 @@ Sources/
   DingLaterMac/    SwiftUI 界面、菜单栏、设置
 Tests/             Swift Testing
 scripts/           构建、测试、图标生成
+docs/              README 图片
 ```
 
 ## 隐私与开源
@@ -68,11 +106,11 @@ scripts/           构建、测试、图标生成
 
 ## 已知限制
 
-- 仅支持 macOS，界面为中文。
+- 仅支持 macOS，界面为中文；预编译包为 Apple 芯片。
 - 实时性取决于钉钉是否把新消息提交到 WAL，应用每 5 秒轮询一次。
 - 连接后只收录新消息（基线语义）；删除或清理分表导致主键倒退时会暂停并提示。
 - 目前按记录收录，尚未做「只看 @ 我」等过滤；附件以可读取的文字或类型占位展示。
-- 未做正式签名与公证，自行构建为本机临时签名。
+- 预编译包使用本机临时签名，**未做 Apple 公证**，首次打开需要右键「打开」或移除 quarantine 属性。
 
 ## 开发与测试
 
