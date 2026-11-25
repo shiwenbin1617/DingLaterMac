@@ -1,0 +1,16 @@
+.build/
+.swiftpm/
+dist/
+DerivedData/
+.DS_Store
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.dylib
+*.p12
+*.mobileprovision
+.env
+*.key
+*.pem
+*.p8
