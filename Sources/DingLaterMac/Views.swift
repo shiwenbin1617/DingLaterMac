@@ -9,6 +9,15 @@ let jade = Color(nsColor: NSColor(name: nil) { appearance in
     return NSColor(srgbRed: 0.07, green: 0.43, blue: 0.37, alpha: 1)
 })
 
+/// Solid fill for prominent buttons: deep enough that white labels stay legible,
+/// unlike the bright accent used for icons and selection.
+let jadeSolid = Color(nsColor: NSColor(name: nil) { appearance in
+    if appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua {
+        return NSColor(srgbRed: 0.04, green: 0.46, blue: 0.39, alpha: 1)
+    }
+    return NSColor(srgbRed: 0.05, green: 0.41, blue: 0.33, alpha: 1)
+})
+
 extension Bucket {
     var icon: String {
         switch self { case .pending: return "tray"; case .later: return "clock"; case .done: return "checkmark.circle" }
@@ -53,7 +62,7 @@ struct InboxView: View {
         }
         .frame(minWidth: 800, minHeight: 460)
         .background(WindowReader { model.window = $0 })
-        .tint(jade)
+        .tint(jadeSolid)
         .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }
         .sheet(item: $customReminder) { group in
             ReminderView { date in model.move(group, to: .later, due: date) }
